@@ -1,0 +1,8 @@
+{
+  "name": "cross-domain-mixpanel-poc",
+  "private": true,
+  "scripts": {
+    "dev:alpha": "node scripts/dev-server.mjs alpha 3000",
+    "dev:bravo": "node scripts/dev-server.mjs bravo 3001"
+  }
+}
