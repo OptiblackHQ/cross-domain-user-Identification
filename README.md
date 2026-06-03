@@ -42,6 +42,12 @@ index → page2 → page3  ──link──►   page2 (arrival)
 
 4. Update `OTHER_SITE_URL` on each project if preview URLs change, or use production domains.
 
+**Bravo 404 on Vercel?** Check:
+
+- Vercel project **Root Directory** is `bravo` (not repo root, not `alpha`).
+- Open **`https://your-bravo.vercel.app/page2.html`** (arrival page), not only the bare domain before redeploy.
+- After pulling latest code, redeploy Bravo (adds `index.html` + `/` → `page2.html` rewrite).
+
 ### Local dev
 
 Use the built-in Node dev server (no Vercel CLI or npm install required).
