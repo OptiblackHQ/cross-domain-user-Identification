@@ -100,6 +100,7 @@ If `npx vercel dev` fails with `ECONNRESET`, that is an npm/network issue while 
    - **Page Viewed** — every load; `arrived_from_other_domain: true` when `distinct_id` was in the query string.
    - **Internal Link Clicked** — same-origin navigation (`a.internal`).
    - **Cross Domain Navigation** — click on `a.cross-domain`; includes `distinct_id_passed`.
+   - All events include **`current_url`** (full page URL at send time) and **`distinct_id`**.
 6. The Mixpanel JS SDK is still loaded for **`identify()`** and cookie persistence only.
 
 ## Verification checklist

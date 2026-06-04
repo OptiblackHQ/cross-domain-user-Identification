@@ -50,6 +50,7 @@
   function track(event, props, callback) {
     var payload = Object.assign({}, props, {
       distinct_id: getDistinctIdForLink(),
+      current_url: window.location.href,
     });
 
     fetch('/api/track', {
