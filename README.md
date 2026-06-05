@@ -2,11 +2,23 @@
 
 Two minimal static sites on **separate origins** (separate Vercel projects), each with its own Mixpanel cookie. Users are stitched across domains by passing `distinct_id` in the URL and calling `mixpanel.identify()` on arrival.
 
-```
-alpha (domain A)                    bravo (domain B)
-index → page2 → page3  ──link──►   page2 (arrival)
-       ▲                            │
-       └──────── return link ───────┘
+**Architecture diagrams:** [docs/architecture.md](docs/architecture.md) (Mermaid — renders on GitHub).
+
+```mermaid
+flowchart LR
+  subgraph A["Domain A · Alpha"]
+    i[index] --> p2[page2] --> p3[page3]
+  end
+  subgraph B["Domain B · Bravo"]
+    b2[page2 arrival]
+  end
+  p3 -->|"href + ?distinct_id="| b2
+  b2 -->|"return link + ?distinct_id="| i
+
+  p3 -.->|track.js| TA[/api/config · /api/track/]
+  b2 -.->|track.js| TB[/api/config · /api/track/]
+  TA --> MP[(Mixpanel)]
+  TB --> MP
 ```
 
 **Important:** Stitching only happens when someone **clicks** a decorated cross-domain link. Typing the Bravo URL directly will not carry Alpha’s id — but returning to Alpha via the decorated link will stitch again.

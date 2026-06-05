@@ -1,4 +1,6 @@
 (function () {
+  var VISITOR_KEY = 'visitor_id';
+  var COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
   var urlParams = new URLSearchParams(window.location.search);
   var urlDistinctId = urlParams.get('distinct_id');
   var arrivedFromOtherDomain = Boolean(urlDistinctId);
@@ -6,20 +8,89 @@
   var DEBUG =
     /localhost|127\.0\.0\.1/.test(window.location.hostname);
 
-  function sessionDistinctId() {
-    var key = 'demo_distinct_id';
-    var stored = sessionStorage.getItem(key);
-    if (!stored) {
-      stored = 'demo-' + Math.random().toString(36).slice(2, 12);
-      sessionStorage.setItem(key, stored);
+  function readCookie(name) {
+    var parts = ('; ' + document.cookie).split('; ' + name + '=');
+    if (parts.length === 2) {
+      return decodeURIComponent(parts.pop().split(';').shift());
     }
-    return stored;
+    return null;
+  }
+
+  function writeCookie(name, value) {
+    document.cookie =
+      name +
+      '=' +
+      encodeURIComponent(value) +
+      '; path=/; max-age=' +
+      COOKIE_MAX_AGE +
+      '; SameSite=Lax';
+  }
+
+  /** Persist: localStorage (primary) + cookie (fallback for blocked LS) */
+  function persistVisitorId(id) {
+    if (!id) return;
+    try {
+      localStorage.setItem(VISITOR_KEY, id);
+    } catch (e) {}
+    writeCookie(VISITOR_KEY, id);
+  }
+
+  /** Read: localStorage → cookie → sessionStorage (legacy only) */
+  function readVisitorId() {
+    try {
+      var ls = localStorage.getItem(VISITOR_KEY);
+      if (ls) return ls;
+    } catch (e) {}
+
+    var ck = readCookie(VISITOR_KEY);
+    if (ck) {
+      persistVisitorId(ck);
+      return ck;
+    }
+
+    try {
+      var legacy = sessionStorage.getItem('demo_distinct_id');
+      if (legacy) {
+        persistVisitorId(legacy);
+        sessionStorage.removeItem('demo_distinct_id');
+        return legacy;
+      }
+    } catch (e) {}
+
+    return null;
+  }
+
+  function createVisitorId() {
+    return (
+      'vid-' +
+      Math.random().toString(36).slice(2, 10) +
+      '-' +
+      Date.now().toString(36)
+    );
+  }
+
+  function getOrCreateVisitorId() {
+    var existing = readVisitorId();
+    if (existing) return existing;
+    var id = createVisitorId();
+    persistVisitorId(id);
+    return id;
+  }
+
+  function adoptVisitorId(id) {
+    if (!id) return;
+    persistVisitorId(id);
+    mixpanelDistinctId = id;
+  }
+
+  if (urlDistinctId) {
+    adoptVisitorId(urlDistinctId);
   }
 
   function getDistinctIdForLink() {
     if (urlDistinctId) return urlDistinctId;
     if (mixpanelDistinctId) return mixpanelDistinctId;
-    return sessionDistinctId();
+    return getOrCreateVisitorId();
   }
 
   function updateDistinctIdDisplay() {
@@ -46,7 +117,6 @@
     });
   }
 
-  /** Send events via our server — avoids CDN/extension breaking mixpanel.track() */
   function track(event, props, callback) {
     var payload = Object.assign({}, props, {
       distinct_id: getDistinctIdForLink(),
@@ -108,7 +178,6 @@
     });
   }
 
-  /** SDK only for cookie + identify(); events go through /api/track */
   function initMixpanelSdk(config) {
     if (!config.token) return;
 
@@ -121,12 +190,14 @@
       try {
         mixpanel.init(config.token, {
           track_pageview: false,
-          persistence: 'cookie',
+          persistence: 'localStorage',
           batch_requests: false,
           loaded: function () {
-            if (urlDistinctId) mixpanel.identify(urlDistinctId);
+            var id = getDistinctIdForLink();
+            mixpanel.identify(id);
             try {
               mixpanelDistinctId = mixpanel.get_distinct_id();
+              persistVisitorId(mixpanelDistinctId);
               decorateCrossDomainLinks(config.otherSiteUrl);
               updateDistinctIdDisplay();
               if (DEBUG) {
@@ -142,7 +213,9 @@
       }
     };
     script.onerror = function () {
-      if (DEBUG) console.warn('[mixpanel] SDK CDN blocked — events still sent via /api/track');
+      if (DEBUG) {
+        console.warn('[mixpanel] SDK CDN blocked — events still sent via /api/track');
+      }
     };
     document.head.appendChild(script);
   }
